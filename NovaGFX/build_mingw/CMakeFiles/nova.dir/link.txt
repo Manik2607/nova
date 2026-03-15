@@ -1,0 +1,2 @@
+C:\msys64\ucrt64\bin\ar.exe qc libnova.a CMakeFiles/nova.dir/src/assets/shader.cpp.obj CMakeFiles/nova.dir/src/assets/texture2d.cpp.obj CMakeFiles/nova.dir/src/input/input.cpp.obj CMakeFiles/nova.dir/src/platform/window.cpp.obj CMakeFiles/nova.dir/src/renderer/renderer2d.cpp.obj CMakeFiles/nova.dir/src/scene/node2d.cpp.obj CMakeFiles/nova.dir/src/scene/polygon2d.cpp.obj CMakeFiles/nova.dir/src/scene/rect_shape.cpp.obj CMakeFiles/nova.dir/src/scene/sprite.cpp.obj
+C:\msys64\ucrt64\bin\ranlib.exe libnova.a

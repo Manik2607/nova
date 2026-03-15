@@ -1,0 +1,15 @@
+mingw32-make: Entering directory 'C:/data/projects/nova/NovaGFX/build_mingw'
+[  2%] Built target glad-generate-files
+[ 10%] Built target glad
+[ 68%] Built target glfw
+[ 94%] Built target nova
+[ 97%] Building CXX object examples/hello_world/CMakeFiles/hello_world.dir/main.cpp.obj
+In file included from C:\data\projects\nova\NovaGFX\examples\hello_world\main.cpp:1:
+C:/data/projects/nova/NovaGFX/include/nova/nova.hpp:10:10: fatal error: nova/math/matrix4.hpp: No such file or directory
+   10 | #include "nova/math/matrix4.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+mingw32-make[2]: *** [examples\hello_world\CMakeFiles\hello_world.dir\build.make:79: examples/hello_world/CMakeFiles/hello_world.dir/main.cpp.obj] Error 1
+mingw32-make[1]: *** [CMakeFiles\Makefile2:338: examples/hello_world/CMakeFiles/hello_world.dir/all] Error 2
+mingw32-make: *** [Makefile:90: all] Error 2
+mingw32-make: Leaving directory 'C:/data/projects/nova/NovaGFX/build_mingw'
