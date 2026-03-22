@@ -43,7 +43,6 @@ struct Vector2 {
     constexpr Vector2& operator-=(T s) noexcept { x -= s; y -= s; return *this; }
     constexpr Vector2& operator*=(T s) noexcept { x *= s; y *= s; return *this; }
     constexpr Vector2& operator/=(T s) noexcept { x /= s; y /= s; return *this; }
-
     constexpr bool operator==(const Vector2& o) const noexcept = default;
 
     constexpr f32 length_squared() const noexcept { return static_cast<f32>(x * x + y * y); }

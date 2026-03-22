@@ -48,6 +48,17 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(stb)
 
+# Box2D
+FetchContent_Declare(
+    box2d
+    GIT_REPOSITORY https://github.com/erincatto/box2d.git
+    GIT_TAG v2.4.1
+)
+set(BOX2D_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(box2d)
+
 file(GLOB_RECURSE NOVA_SOURCES "src/*.cpp")
 file(GLOB_RECURSE NOVA_HEADERS "include/*.hpp")
 
@@ -71,7 +82,7 @@ target_include_directories(nova
         ${stb_SOURCE_DIR}
 )
 
-target_link_libraries(nova PUBLIC glfw glad)
+target_link_libraries(nova PUBLIC glfw glad box2d)
 
 if(MSVC)
     target_compile_options(nova PRIVATE /W4 /WX /permissive- /FS)
@@ -85,4 +96,6 @@ endif()
 
 if(NOVA_BUILD_EXAMPLES)
     add_subdirectory(examples/hello_world)
+    add_subdirectory(examples/physics_demo)
+    add_subdirectory(examples/car_game)
 endif()

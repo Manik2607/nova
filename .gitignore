@@ -1,0 +1,57 @@
+# Build directories
+build/
+build_mingw/
+bin/
+obj/
+dist/
+out/
+
+# IDE files
+.vscode/
+.vs/
+*.swp
+*.swo
+*.user
+*.suo
+*.sln
+*.vcxproj
+*.filters
+.idea/
+
+# Compiled binaries
+*.exe
+*.dll
+*.so
+*.a
+*.lib
+*.o
+*.obj
+*.pdb
+*.ilk
+*.exp
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+Makefile
+install_manifest.txt
+compile_commands.json
+_deps/
+CMakeCache.txt
+cmake_out.txt
+
+# Logs and temporary files
+*.log
+*.tmp
+build.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*

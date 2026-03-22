@@ -1,3 +1,0 @@
-C:/data/projects/nova/NovaGFX/build_mingw/_deps/glfw-subbuild/CMakeFiles/glfw-populate.dir
-C:/data/projects/nova/NovaGFX/build_mingw/_deps/glfw-subbuild/CMakeFiles/edit_cache.dir
-C:/data/projects/nova/NovaGFX/build_mingw/_deps/glfw-subbuild/CMakeFiles/rebuild_cache.dir
