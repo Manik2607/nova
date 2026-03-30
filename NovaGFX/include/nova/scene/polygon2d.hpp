@@ -1,9 +1,11 @@
 #pragma once
-#include "nova/scene/node2d.hpp"
+#include "node2d.hpp"
 #include "nova/math/color.hpp"
 #include <vector>
 
 namespace nova {
+
+class Renderer2D;
 
 class Polygon2D : public Node2D {
 public:

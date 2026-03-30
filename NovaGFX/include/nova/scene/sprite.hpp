@@ -1,8 +1,10 @@
 #pragma once
-#include "nova/scene/node2d.hpp"
+#include "node2d.hpp"
 #include "nova/assets/texture2d.hpp"
 
 namespace nova {
+
+class Renderer2D;
 
 class Sprite : public Node2D {
 public:

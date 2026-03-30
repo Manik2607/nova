@@ -110,7 +110,7 @@ Renderer2D::Renderer2D() {
     m_shader->bind();
     for (usize i = 0; i < MAX_TEXTURE_SLOTS; ++i) {
         std::string name = "u_Textures[" + std::to_string(i) + "]";
-        m_shader->set_int(name, i);
+        m_shader->set_int(name, static_cast<nova::i32>(i));
     }
     m_shader->unbind();
 
@@ -138,7 +138,7 @@ void Renderer2D::init_camera(Vector2f position, f32 zoom, Vector2f viewport_size
 
     m_shader->bind();
     m_shader->set_mat4("u_Projection", proj);
-    m_shader->unbind();
+    // Removed unbind so that it stays bound during drawing.
 }
 
 void Renderer2D::begin() {

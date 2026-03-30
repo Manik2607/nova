@@ -1,8 +1,10 @@
 #pragma once
-#include "nova/scene/node2d.hpp"
+#include "node2d.hpp"
 #include "nova/math/color.hpp"
 
 namespace nova {
+
+class Renderer2D;
 
 class RectShape : public Node2D {
 public:
