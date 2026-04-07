@@ -4,9 +4,20 @@
 #include <algorithm>
 #include <array>
 
+#include <filesystem>
+
 Car::Car(b2World* world, Vector2f start_pos, f32 start_angle)
     : m_world(world)
 {
+    std::string path = "../examples/neon_drift/car.png";
+    if (std::filesystem::exists(path)) {
+        m_texture = std::make_unique<Texture2D>(path);
+    } else if (std::filesystem::exists("examples/neon_drift/car.png")) {
+        m_texture = std::make_unique<Texture2D>("examples/neon_drift/car.png");
+    } else if (std::filesystem::exists("car.png")) {
+        m_texture = std::make_unique<Texture2D>("car.png");
+    }
+
     b2BodyDef bd;
     bd.type = b2_dynamicBody;
     bd.position.Set(start_pos.x, start_pos.y);
@@ -16,7 +27,19 @@ Car::Car(b2World* world, Vector2f start_pos, f32 start_angle)
     m_body = m_world->CreateBody(&bd);
 
     b2PolygonShape shape;
-    shape.SetAsBox(CAR_WIDTH * 0.5f, CAR_LENGTH * 0.5f);
+    b2Vec2 verts[8];
+    f32 hx = CAR_WIDTH * 0.5f;
+    f32 hy = CAR_LENGTH * 0.5f;
+    f32 c = 6.0f; // chamfer amount
+    verts[0].Set( -hx, -hy + c );
+    verts[1].Set( -hx + c, -hy );
+    verts[2].Set(  hx - c, -hy );
+    verts[3].Set(  hx, -hy + c );
+    verts[4].Set(  hx,  hy - c );
+    verts[5].Set(  hx - c,  hy );
+    verts[6].Set( -hx + c,  hy );
+    verts[7].Set( -hx,  hy - c );
+    shape.Set(verts, 8);
 
     b2FixtureDef fd;
     fd.shape = &shape;
@@ -62,8 +85,9 @@ void Car::apply_drive_force(f32 /*dt*/) {
 
     f32 force = 0.0f;
     if (throttle > 0.0f) {
-        // Apply full drive force regardless of current speed
-        force = DRIVE_FORCE * throttle;
+        // Smoothly reduce force as we approach top speed to prevent Box2D translation limit jitter
+        f32 speed_factor = std::max(0.0f, 1.0f - (speed / MAX_SPEED));
+        force = DRIVE_FORCE * throttle * speed_factor;
     } else if (throttle < 0.0f) {
         // Check if moving forward → brake, else reverse
         Vector2f vel = get_velocity();
@@ -156,7 +180,7 @@ bool Car::is_drifting() const {
 
 Vector2f Car::get_forward() const {
     f32 a = m_body->GetAngle();
-    return {-std::sin(a), std::cos(a)};
+    return {std::sin(a), -std::cos(a)};
 }
 
 Vector2f Car::get_right() const {
@@ -208,124 +232,16 @@ void Car::draw(Renderer2D& renderer) {
         renderer.draw_polygon(glow_pts, glow);
     }
 
-    // ── Main body (low-poly angular shape) ──
-    {
-        // Tapered nose, wide middle, narrower tail
-        std::array<Vector2f, 8> body = {
-            xform(-hw * 0.5f, -hl),        // front-left (narrow nose)
-            xform( hw * 0.5f, -hl),         // front-right
-            xform( hw,        -hl * 0.4f),  // front-shoulder right
-            xform( hw,         hl * 0.5f),  // rear-shoulder right
-            xform( hw * 0.85f, hl),         // rear-right
-            xform(-hw * 0.85f, hl),         // rear-left
-            xform(-hw,         hl * 0.5f),  // rear-shoulder left
-            xform(-hw,        -hl * 0.4f),  // front-shoulder left
-        };
-        renderer.draw_polygon(body, body_main);
+    if (m_texture) {
+        // Draw the neon drift sprite at the correct rotation and size.
+        // The image is facing "straight up" so rotation might need an offset and scale.
+        // Box2D 0 degrees is typically right, but we want it to map correctly to the engine's up vector.
+        Vector2f scale = {CAR_WIDTH * 1.5f, CAR_LENGTH * 1.5f};
+        renderer.draw_sprite(*m_texture, pos, scale, Color::WHITE(), m_body->GetAngle(), {0.5f, 0.5f});
+    } else {
+        // ── Main body (low-poly angular shape) ──
 
-        // Dark center stripe
-        std::array<Vector2f, 4> stripe = {
-            xform(-hw * 0.15f, -hl * 0.8f),
-            xform( hw * 0.15f, -hl * 0.8f),
-            xform( hw * 0.15f,  hl * 0.85f),
-            xform(-hw * 0.15f,  hl * 0.85f),
-        };
-        renderer.draw_polygon(stripe, body_dark);
     }
-
-    // ── Windshield ──
-    {
-        Color windshield(0.15f, 0.2f, 0.4f, 0.85f);
-        std::array<Vector2f, 4> ws = {
-            xform(-hw * 0.4f, -hl * 0.5f),
-            xform( hw * 0.4f, -hl * 0.5f),
-            xform( hw * 0.55f, -hl * 0.15f),
-            xform(-hw * 0.55f, -hl * 0.15f),
-        };
-        renderer.draw_polygon(ws, windshield);
-    }
-
-    // ── Side panels (accent color) ──
-    {
-        // Left panel
-        std::array<Vector2f, 4> left_p = {
-            xform(-hw,         -hl * 0.3f),
-            xform(-hw * 0.75f, -hl * 0.3f),
-            xform(-hw * 0.75f,  hl * 0.35f),
-            xform(-hw,          hl * 0.35f),
-        };
-        renderer.draw_polygon(left_p, accent);
-        // Right panel
-        std::array<Vector2f, 4> right_p = {
-            xform(hw * 0.75f, -hl * 0.3f),
-            xform(hw,         -hl * 0.3f),
-            xform(hw,          hl * 0.35f),
-            xform(hw * 0.75f,  hl * 0.35f),
-        };
-        renderer.draw_polygon(right_p, accent);
-    }
-
-    // ── Headlights ──
-    {
-        Color headlight(1.0f, 1.0f, 0.95f, 1.0f);
-        Color headlight_glow(1.0f, 1.0f, 0.8f, 0.25f);
-        // Left headlight
-        std::array<Vector2f, 3> hl_l = {
-            xform(-hw * 0.45f, -hl),
-            xform(-hw * 0.15f, -hl),
-            xform(-hw * 0.3f,  -hl * 0.85f),
-        };
-        renderer.draw_polygon(hl_l, headlight);
-        renderer.draw_circle(xform(-hw * 0.3f, -hl * 0.95f), 6.0f, headlight_glow);
-        // Right headlight
-        std::array<Vector2f, 3> hl_r = {
-            xform(hw * 0.15f, -hl),
-            xform(hw * 0.45f, -hl),
-            xform(hw * 0.3f,  -hl * 0.85f),
-        };
-        renderer.draw_polygon(hl_r, headlight);
-        renderer.draw_circle(xform(hw * 0.3f, -hl * 0.95f), 6.0f, headlight_glow);
-    }
-
-    // ── Taillights ──
-    {
-        Color tail(1.0f, 0.05f, 0.15f, 1.0f);
-        Color tail_glow = tail;
-        tail_glow.a = 0.3f;
-        // Left taillight
-        std::array<Vector2f, 4> tl_l = {
-            xform(-hw * 0.8f,  hl * 0.85f),
-            xform(-hw * 0.3f,  hl * 0.85f),
-            xform(-hw * 0.3f,  hl),
-            xform(-hw * 0.8f,  hl),
-        };
-        renderer.draw_polygon(tl_l, tail);
-        renderer.draw_circle(xform(-hw * 0.55f, hl * 0.92f), 5.0f, tail_glow);
-        // Right taillight
-        std::array<Vector2f, 4> tl_r = {
-            xform(hw * 0.3f,  hl * 0.85f),
-            xform(hw * 0.8f,  hl * 0.85f),
-            xform(hw * 0.8f,  hl),
-            xform(hw * 0.3f,  hl),
-        };
-        renderer.draw_polygon(tl_r, tail);
-        renderer.draw_circle(xform(hw * 0.55f, hl * 0.92f), 5.0f, tail_glow);
-    }
-
+    
     // ── Body outline (neon edge glow) ──
-    {
-        Color outline = body_main;
-        outline.a = 0.6f;
-        std::array<Vector2f, 8> body_outline = {
-            xform(-hw * 0.5f, -hl),
-            xform( hw * 0.5f, -hl),
-            xform( hw,        -hl * 0.4f),
-            xform( hw,         hl * 0.5f),
-            xform( hw * 0.85f, hl),
-            xform(-hw * 0.85f, hl),
-            xform(-hw,         hl * 0.5f),
-            xform(-hw,        -hl * 0.4f),
-        };
-        renderer.draw_polygon_outline(body_outline, outline, 2.0f);
-    }
 }

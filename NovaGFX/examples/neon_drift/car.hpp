@@ -2,6 +2,8 @@
 #include <nova/nova.hpp>
 #include <box2d/box2d.h>
 #include "nova/scene/tilemap.hpp"
+#include "nova/assets/texture2d.hpp"
+#include <memory>
 
 using namespace nova;
 
@@ -48,6 +50,7 @@ private:
 
     b2World* m_world;
     b2Body* m_body;
+    std::unique_ptr<Texture2D> m_texture;
 
     // Car dimensions (in pixels, world units)
     static constexpr f32 CAR_WIDTH  = 40.0f;
@@ -55,11 +58,11 @@ private:
     static constexpr f32 WHEELBASE  = 40.0f;  // distance between axles
 
     // Physics tuning
-    static constexpr f32 MAX_SPEED        = 30000.0f;   // Top speed cap
-    static constexpr f32 DRIVE_FORCE      = 3000.0f;   // Dramatically increased to give actual top speed
-    static constexpr f32 BRAKE_FORCE      = 3000.0f;   // Increased to allow braking at new speeds
+    static constexpr f32 MAX_SPEED        = 600.0f;   // Top speed cap
+    static constexpr f32 DRIVE_FORCE      = 1500.0f;   // Dramatically increased to give actual top speed
+    static constexpr f32 BRAKE_FORCE      = 1500.0f;   // Increased to allow braking at new speeds
     static constexpr f32 REVERSE_FORCE    = 1000.0f;
-    static constexpr f32 STEER_SPEED      = 7.0f;      // rad/s (increased for sensitive steering)
+    static constexpr f32 STEER_SPEED      = 3.5f;      // rad/s
     static constexpr f32 LATERAL_FRICTION = 16.0f;     // how quickly lateral velocity kills
     static constexpr f32 DRIFT_THRESHOLD  = 0.25f;     // slip angle to count as drifting
 

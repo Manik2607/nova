@@ -62,7 +62,7 @@ void Game::update(f32 dt) {
     }
 
     // Zoom based on speed
-    f32 target_zoom = 0.7f - (speed / 800.0f) * 0.15f; // zoom out at speed
+    f32 target_zoom = 1.3f - (speed / 800.0f) * 0.3f; // zoom out at speed
     m_camera.set_target_zoom(target_zoom);
 
     m_camera.update(dt);

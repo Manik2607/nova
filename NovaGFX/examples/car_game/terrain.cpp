@@ -1,9 +1,35 @@
 #include "terrain.hpp"
 #include <cmath>
+#include <algorithm>
 
 using namespace nova;
 
 extern const float PIXELS_PER_METER;
+
+namespace {
+    float hash(float n) {
+        float f = std::sin(n) * 43758.5453123f;
+        return f - std::floor(f);
+    }
+    
+    float noise(float x) {
+        float i = std::floor(x);
+        float f = x - i;
+        float u = f * f * (3.0f - 2.0f * f); 
+        return hash(i) * (1.0f - u) + hash(i + 1.0f) * u;
+    }
+
+    float fbm(float x, int octaves) {
+        float value = 0.0f;
+        float amplitude = 0.5f;
+        for (int i = 0; i < octaves; ++i) {
+            value += amplitude * noise(x);
+            x = x * 2.0f + 10.0f;
+            amplitude *= 0.5f;
+        }
+        return value;
+    }
+}
 
 TerrainGenerator::TerrainGenerator(b2World* world) : m_world(world) {
     // Generate initial chunks
@@ -13,23 +39,28 @@ TerrainGenerator::TerrainGenerator(b2World* world) : m_world(world) {
 }
 
 float TerrainGenerator::get_height(float x) {
-    // Mix of sine waves for rolling hills
     float y = 0.0f;
-    y += std::sin(x * 0.1f) * 2.5f;
-    y += std::sin(x * 0.3f) * 0.8f;
-    y += std::sin(x * 0.05f) * 4.0f;
-
-    // Add procedural ramps
-    float ramp_mod = std::fmod(x, 150.0f);
-    if (ramp_mod < 0) ramp_mod += 150.0f; // Handle negative x
-
-    if (ramp_mod > 100.0f && ramp_mod <= 120.0f) {
-        y -= (ramp_mod - 100.0f) * 0.8f; // Ramp up gradually (negative Y is up)
-    } else if (ramp_mod > 120.0f && ramp_mod <= 122.0f) {
-        y -= 16.0f; // Flat top lip
-    }
     
-    return y + 8.0f; // Base offset
+    // Very low frequency, large rolling curvy hills (SOFTER)
+    y += std::sin(x * 0.015f) * 10.0f;
+    y += std::sin(x * 0.03f) * 5.0f;
+    
+    // Add noise-based terrain macro variations
+    y += (fbm(x * 0.03f * roughness, 3) - 0.5f) * 10.0f * bumpiness;
+
+    // Mask for micro bumps (only appear in some places)
+    float bump_density = noise(x * 0.05f * roughness + 123.4f);
+    float bump_mask = std::max(0.0f, bump_density - 0.6f) * 2.5f;
+
+    // Add micro bumps, modulated by the mask
+    float bumps = fbm(x * 1.0f * roughness, 2);
+    y += (bumps - 0.5f) * 2.0f * bump_mask * bumpiness;
+
+    // Extra sharp micro details sparsely scattered
+    float sharp_bump_mask = std::max(0.0f, noise(x * 0.15f * roughness + 456.7f) - 0.8f) * 5.0f;
+    y += (noise(x * 3.0f * roughness) - 0.5f) * 1.0f * sharp_bump_mask * bumpiness;
+    
+    return y + 10.0f; // Base offset
 }
 
 void TerrainGenerator::generate_chunk() {
@@ -95,31 +126,55 @@ void TerrainGenerator::update(float camera_x) {
     }
 }
 
+void TerrainGenerator::reset(float start_x) {
+    // Destroy all existing chunk bodies
+    for (auto& chunk : m_chunks) {
+        m_world->DestroyBody(chunk.body);
+    }
+    m_chunks.clear();
+
+    // Restart generation from a little behind the car
+    float start_m = start_x / PIXELS_PER_METER - CHUNK_WIDTH;
+    m_last_generated_x = start_m;
+
+    // Regenerate chunks ahead
+    while (m_last_generated_x < start_m + MAX_GENERATE_AHEAD + CHUNK_WIDTH) {
+        generate_chunk();
+    }
+}
+
 void TerrainGenerator::draw(Renderer2D& renderer) {
-    // We will draw the terrain as filled polygons dropping down to the bottom of the screen.
-    const float BOTTOM_Y = 3000.0f; // Some deep Y coordinate in pixels
+    const float BOTTOM_Y = 3000.0f; // Deep Y coordinate in pixels
+    const float TOP_LAYER_THICKNESS = 40.0f; // Pixels
     
-    Color ground_top(0.25f, 0.5f, 0.25f, 1.0f);   // Grass
-    Color ground_bottom(0.15f, 0.1f, 0.05f, 1.0f); // Dirt
-    Color line_color(0.1f, 0.4f, 0.1f, 1.0f);
+    Color ground_top(0.3f, 0.7f, 0.2f, 1.0f);   // Bright Green grass
+    Color ground_bottom(0.25f, 0.15f, 0.05f, 1.0f); // Mud
+    Color line_color(0.5f, 0.9f, 0.4f, 1.0f);   // Edge highlight
     
     for (const auto& chunk : m_chunks) {
         if (chunk.visual_points.size() < 2) continue;
         
-        // Draw lines along the edge
         for (usize i = 0; i < chunk.visual_points.size() - 1; ++i) {
-            renderer.draw_line(chunk.visual_points[i], chunk.visual_points[i+1], line_color, 4.0f);
-        }
-        
-        // Fill underneath the hills by faking thick lines vertically
-        for (usize i = 0; i < chunk.visual_points.size() - 1; ++i) {
-            std::vector<Vector2f> quad = {
+            // Draw bright green top edge
+            renderer.draw_line(chunk.visual_points[i], chunk.visual_points[i+1], line_color, 6.0f);
+            
+            // Draw Green Top Layer
+            std::vector<Vector2f> top_quad = {
                 chunk.visual_points[i],
                 chunk.visual_points[i+1],
+                {chunk.visual_points[i+1].x, chunk.visual_points[i+1].y + TOP_LAYER_THICKNESS},
+                {chunk.visual_points[i].x, chunk.visual_points[i].y + TOP_LAYER_THICKNESS}
+            };
+            renderer.draw_polygon(top_quad, ground_top);
+
+            // Draw Mud Bottom Layer
+            std::vector<Vector2f> bottom_quad = {
+                {chunk.visual_points[i].x, chunk.visual_points[i].y + TOP_LAYER_THICKNESS},
+                {chunk.visual_points[i+1].x, chunk.visual_points[i+1].y + TOP_LAYER_THICKNESS},
                 {chunk.visual_points[i+1].x, BOTTOM_Y},
                 {chunk.visual_points[i].x, BOTTOM_Y}
             };
-            renderer.draw_polygon(quad, ground_bottom);
+            renderer.draw_polygon(bottom_quad, ground_bottom);
         }
     }
 }

@@ -18,7 +18,7 @@ out float v_TexIndex;
 uniform mat4 u_Projection;
 
 void main() {
-    v_TexCoord = -a_TexCoord;
+    v_TexCoord = vec2(a_TexCoord.x, 1.0 - a_TexCoord.y);
     v_Color = a_Color;
     v_TexIndex = a_TexIndex;
     gl_Position = u_Projection * vec4(a_Position, 0.0, 1.0);

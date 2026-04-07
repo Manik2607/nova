@@ -18,6 +18,10 @@ public:
     // Generates chunks ahead of the given x position, and destroys chunks that are too far behind.
     void update(float camera_x);
     void draw(nova::Renderer2D& renderer);
+    void reset(float start_x);
+
+    float bumpiness = 1.0f;
+    float roughness = 1.5f;
 
 private:
     b2World* m_world;

@@ -7,8 +7,8 @@ using namespace nova;
 
 int main() {
     try {
-        constexpr i32 WINDOW_W = 720;
-        constexpr i32 WINDOW_H = 720/2;
+        constexpr i32 WINDOW_W = 1280;
+        constexpr i32 WINDOW_H = 720;
 
         Window window(WINDOW_W, WINDOW_H, "NEON DRIFT");
         window.set_vsync(true);
