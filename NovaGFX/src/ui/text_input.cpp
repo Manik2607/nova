@@ -44,38 +44,6 @@ void TextInput::apply_step(float delta) {
 void TextInput::draw(Renderer2D& renderer) {
     Transform2D global = get_global_transform();
 
-    // --- Step buttons (only for numeric modes) ---
-    const f32 btn_h = size.y;
-    // Buttons sit to the right of the text field
-    Vector2f btn_base = global.origin + Vector2f{size.x, 0.0f};
-
-    if (is_numeric()) {
-        // Decrease (–) button
-        Color dec_col = m_btn_dec_pressed ? color_btn_pressed
-                      : (m_btn_dec_hovered ? color_btn_hover : color_btn_normal);
-        renderer.draw_rect(btn_base, {BTN_W, btn_h}, dec_col);
-        renderer.draw_rect_outline(btn_base, {BTN_W, btn_h}, color_border, 1.0f);
-        if (text_renderer) {
-            f32 lbl_w = text_renderer->measure_text("-", font_size);
-            text_renderer->draw_text(renderer, "-",
-                btn_base + Vector2f{(BTN_W - lbl_w) * 0.5f, (btn_h - font_size) * 0.5f},
-                font_size, color_text);
-        }
-
-        // Increase (+) button
-        Vector2f inc_pos = btn_base + Vector2f{BTN_W, 0.0f};
-        Color inc_col = m_btn_inc_pressed ? color_btn_pressed
-                      : (m_btn_inc_hovered ? color_btn_hover : color_btn_normal);
-        renderer.draw_rect(inc_pos, {BTN_W, btn_h}, inc_col);
-        renderer.draw_rect_outline(inc_pos, {BTN_W, btn_h}, color_border, 1.0f);
-        if (text_renderer) {
-            f32 lbl_w = text_renderer->measure_text("+", font_size);
-            text_renderer->draw_text(renderer, "+",
-                inc_pos + Vector2f{(BTN_W - lbl_w) * 0.5f, (btn_h - font_size) * 0.5f},
-                font_size, color_text);
-        }
-    }
-
     // --- Background ---
     Color bg = is_focused ? color_bg_focused : color_bg_normal;
     renderer.draw_rect(global.origin, size, bg);
@@ -85,19 +53,56 @@ void TextInput::draw(Renderer2D& renderer) {
     if (text_renderer) {
         clamp_cursor();
 
+        auto draw_txt = [&](std::string_view str, Vector2f pos, f32 fs, Color col) {
+            if (font_override) text_renderer->draw_text_with_font(renderer, *font_override, str, pos, fs, col);
+            else text_renderer->draw_text(renderer, str, pos, fs, col);
+        };
+        auto measure_txt = [&](std::string_view str, f32 fs) {
+            if (font_override) return text_renderer->measure_text_with_font(*font_override, str, fs);
+            return text_renderer->measure_text(str, fs);
+        };
+
+        // --- Step buttons (only for numeric modes) ---
+        const f32 btn_h = size.y;
+        // Buttons sit to the right of the text field
+        Vector2f btn_base = global.origin + Vector2f{size.x, 0.0f};
+
+        if (is_numeric()) {
+            // Decrease (–) button
+            Color dec_col = m_btn_dec_pressed ? color_btn_pressed
+                          : (m_btn_dec_hovered ? color_btn_hover : color_btn_normal);
+            renderer.draw_rect(btn_base, {BTN_W, btn_h}, dec_col);
+            renderer.draw_rect_outline(btn_base, {BTN_W, btn_h}, color_border, 1.0f);
+            f32 lbl_w = measure_txt("-", font_size);
+            draw_txt("-", btn_base + Vector2f{(BTN_W - lbl_w) * 0.5f, (btn_h - font_size) * 0.5f},
+                     font_size, color_text);
+
+            // Increase (+) button
+            Vector2f inc_pos = btn_base + Vector2f{BTN_W, 0.0f};
+            Color inc_col = m_btn_inc_pressed ? color_btn_pressed
+                          : (m_btn_inc_hovered ? color_btn_hover : color_btn_normal);
+            renderer.draw_rect(inc_pos, {BTN_W, btn_h}, inc_col);
+            renderer.draw_rect_outline(inc_pos, {BTN_W, btn_h}, color_border, 1.0f);
+            lbl_w = measure_txt("+", font_size);
+            draw_txt("+", inc_pos + Vector2f{(BTN_W - lbl_w) * 0.5f, (btn_h - font_size) * 0.5f},
+                     font_size, color_text);
+        }
+
         // Measure text before cursor to position the caret
         std::string before_cursor = text.substr(0, static_cast<size_t>(m_cursor));
-        f32 caret_x = text_renderer->measure_text(before_cursor.empty() ? "" : before_cursor, font_size);
+        f32 caret_x = measure_txt(before_cursor.empty() ? "" : before_cursor, font_size);
 
-        Vector2f text_pos = global.origin + Vector2f{10.0f, (size.y - font_size) * 0.5f};
+        // Baseline for centered text in the input box
+        Vector2f text_pos = global.origin + Vector2f{10.0f, size.y * 0.5f + font_size * 0.35f};
 
         if (!text.empty()) {
-            text_renderer->draw_text(renderer, text, text_pos, font_size, color_text);
+            draw_txt(text, text_pos, font_size, color_text);
         }
 
         // Caret
         if (is_focused && m_show_caret) {
-            Vector2f caret_pos = text_pos + Vector2f{caret_x + 1.0f, 0.0f};
+            // Center caret vertically
+            Vector2f caret_pos = global.origin + Vector2f{10.0f + caret_x, (size.y - font_size) * 0.5f};
             renderer.draw_rect(caret_pos, {2.0f, font_size}, color_text);
         }
     }
@@ -115,6 +120,21 @@ void TextInput::update(f32 delta) {
             m_blink_timer -= 0.5f;
         }
         handle_keyboard_input();
+
+        // Handle Backspace repeating
+        if (Input::is_key_down(Key::BACKSPACE)) {
+            m_backspace_timer += delta;
+            if (m_backspace_timer >= 0.05f) { // Deletion rate
+                clamp_cursor();
+                if (m_cursor > 0 && !text.empty()) {
+                    --m_cursor;
+                    text.erase(text.begin() + m_cursor);
+                    m_show_caret = true;
+                    m_blink_timer = 0.0f;
+                }
+                m_backspace_timer = 0.0f;
+            }
+        }
     } else {
         m_show_caret = false;
         m_blink_timer = 0.0f;
@@ -216,13 +236,16 @@ void TextInput::handle_keyboard_input() {
         return;
     }
 
-    // Backspace (delete char before cursor)
+    // Backspace (initial press)
     if (Input::is_key_pressed(Key::BACKSPACE)) {
         clamp_cursor();
         if (m_cursor > 0 && !text.empty()) {
             --m_cursor;
             text.erase(text.begin() + m_cursor);
+            m_show_caret = true;
+            m_blink_timer = 0.0f;
         }
+        m_backspace_timer = -0.4f; // Initial delay before repeating starts
         return;
     }
 

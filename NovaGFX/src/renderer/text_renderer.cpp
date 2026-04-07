@@ -1,10 +1,11 @@
 #include "nova/renderer/text_renderer.hpp"
-#include <cctype>
+#include "default_font.hpp"
 
 namespace nova {
 
 TextRenderer::TextRenderer() {
     init_glyphs();
+    m_default_font = std::make_unique<Font>(DEFAULT_FONT_DATA, DEFAULT_FONT_SIZE, 32.0f);
 }
 
 void TextRenderer::init_glyphs() {
@@ -96,44 +97,68 @@ void TextRenderer::init_glyphs() {
 void TextRenderer::draw_text(Renderer2D& renderer, std::string_view text,
                               Vector2f position, f32 size, Color color,
                               f32 thickness) {
+    (void)thickness; // thickness is not supported in TTF rendering for now
+    draw_text_with_font(renderer, *m_default_font, text, position, size, color);
+}
+
+void TextRenderer::draw_text_with_font(Renderer2D& renderer, const Font& font, std::string_view text,
+                                       Vector2f position, f32 size, Color color) {
     f32 cursor_x = position.x;
-    f32 line_thickness = thickness * (size / 20.0f);
-    if (line_thickness < 1.0f) line_thickness = 1.0f;
+    f32 scale = size / font.get_size();
 
     for (char c : text) {
         if (c == '\n') {
             cursor_x = position.x;
-            position.y += size * 1.2f;
+            position.y += size * 1.1f;
             continue;
         }
-        draw_glyph(renderer, c, {cursor_x, position.y}, size, color, line_thickness);
-        usize idx = static_cast<usize>(static_cast<unsigned char>(c));
-        f32 w = (idx < 128 && !m_glyphs[idx].segments.empty()) ? m_glyphs[idx].width : 0.6f;
-        cursor_x += w * size * spacing + size * 0.08f; // glyph width + gap
+
+        const auto* glyph = font.get_glyph(c);
+        if (!glyph) continue;
+
+        // Skip if atlas failed to load
+        if (font.get_atlas().get_width() == 0) continue;
+
+        Vector2f size_pixels = {
+            (glyph->uv_max.x - glyph->uv_min.x) * (f32)font.get_atlas().get_width(),
+            (glyph->uv_max.y - glyph->uv_min.y) * (f32)font.get_atlas().get_height()
+        };
+
+        Rect2f src_rect = {
+            glyph->uv_min * Vector2f((f32)font.get_atlas().get_width(), (f32)font.get_atlas().get_height()),
+            size_pixels
+        };
+
+        // Bearing is the offset from baseline to top-left of glyph bounding box.
+        // glyph->bearing.y is negative for pixels above baseline.
+        Vector2f glyph_top_left = {
+            cursor_x + glyph->bearing.x * scale,
+            position.y + glyph->bearing.y * scale
+        };
+
+        Vector2f draw_size = glyph->size * scale;
+        Vector2f center_pos = glyph_top_left + draw_size * 0.5f;
+
+        renderer.draw_sprite_region(font.get_atlas(), src_rect, center_pos, draw_size, color);
+
+        cursor_x += glyph->advance * scale * spacing;
     }
 }
 
 f32 TextRenderer::measure_text(std::string_view text, f32 size) const {
-    f32 width = 0.0f;
-    for (char c : text) {
-        usize idx = static_cast<usize>(static_cast<unsigned char>(c));
-        f32 w = (idx < 128 && !m_glyphs[idx].segments.empty()) ? m_glyphs[idx].width : 0.6f;
-        width += w * size * spacing + size * 0.08f;
-    }
-    return width;
+    return measure_text_with_font(*m_default_font, text, size);
 }
 
-void TextRenderer::draw_glyph(Renderer2D& renderer, char c, Vector2f pos,
-                                f32 size, Color color, f32 thickness) {
-    usize idx = static_cast<usize>(static_cast<unsigned char>(c));
-    if (idx >= 128) return;
-    const auto& glyph = m_glyphs[idx];
+f32 TextRenderer::measure_text_with_font(const Font& font, std::string_view text, f32 size) const {
+    f32 width = 0.0f;
+    f32 scale = size / font.get_size();
 
-    for (const auto& seg : glyph.segments) {
-        Vector2f a = pos + Vector2f(seg.x1 * size, seg.y1 * size);
-        Vector2f b = pos + Vector2f(seg.x2 * size, seg.y2 * size);
-        renderer.draw_line(a, b, color, thickness);
+    for (char c : text) {
+        if (const auto* glyph = font.get_glyph(c)) {
+            width += glyph->advance * scale * spacing;
+        }
     }
+    return width;
 }
 
 } // namespace nova

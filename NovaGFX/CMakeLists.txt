@@ -96,6 +96,7 @@ endif()
 
 if(NOVA_BUILD_EXAMPLES)
     add_subdirectory(examples/hello_world)
+    add_subdirectory(examples/font_test)
     add_subdirectory(examples/physics_demo)
     add_subdirectory(examples/car_game)
     add_subdirectory(examples/neon_drift)

@@ -17,10 +17,11 @@ public:
     Color color_text{Color::WHITE()};
 
     TextRenderer* text_renderer{nullptr};
+    const Font* font_override{nullptr};
     std::function<void()> on_pressed;
 
     Button(TextRenderer* tr, std::string_view initial_text = "")
-        : text_renderer(tr), text(initial_text) {
+        : text(initial_text), text_renderer(tr) {
         size = {120.0f, 40.0f}; // default size
     }
 

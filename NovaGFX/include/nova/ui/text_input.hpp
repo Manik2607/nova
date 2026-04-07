@@ -30,6 +30,7 @@ public:
     Color color_btn_pressed{0.12f, 0.12f, 0.12f, 1.0f};
 
     TextRenderer* text_renderer{nullptr};
+    const Font* font_override{nullptr};
 
     /// Mode controlling accepted input and whether step buttons appear.
     InputMode mode{InputMode::TEXT};
@@ -38,7 +39,7 @@ public:
     float step{1.0f};
 
     TextInput(TextRenderer* tr, std::string_view initial_text = "", InputMode m = InputMode::TEXT)
-        : text_renderer(tr), text(initial_text), mode(m) {
+        : text(initial_text), text_renderer(tr), mode(m) {
         size = {200.0f, 40.0f};
     }
 
@@ -78,6 +79,8 @@ private:
     bool m_btn_dec_hovered{false};
     bool m_btn_inc_pressed{false};
     bool m_btn_dec_pressed{false};
+    
+    f32 m_backspace_timer{0.0f};
 
     static constexpr f32 BTN_W = 22.0f;  ///< Width of each step button
 

@@ -11,9 +11,10 @@ public:
     f32 font_size{24.0f};
     Color color{Color::WHITE()};
     TextRenderer* text_renderer{nullptr};
+    const Font* font_override{nullptr};
 
     Label(TextRenderer* tr, std::string_view initial_text = "")
-        : text_renderer(tr), text(initial_text) {}
+        : text(initial_text), text_renderer(tr) {}
 
     void draw(Renderer2D& renderer) override;
 
