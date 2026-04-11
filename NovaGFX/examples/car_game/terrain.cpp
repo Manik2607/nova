@@ -32,6 +32,8 @@ namespace {
 }
 
 TerrainGenerator::TerrainGenerator(b2World* world) : m_world(world) {
+    m_dirt_tex = std::make_shared<Texture2D>("examples/car_game/Images/dirt.png");
+    m_grass_tex = std::make_shared<Texture2D>("examples/car_game/Images/grass.png");
     // Generate initial chunks
     while (m_last_generated_x < MAX_GENERATE_AHEAD) {
         generate_chunk();
@@ -149,32 +151,55 @@ void TerrainGenerator::draw(Renderer2D& renderer) {
     
     Color ground_top(0.3f, 0.7f, 0.2f, 1.0f);   // Bright Green grass
     Color ground_bottom(0.25f, 0.15f, 0.05f, 1.0f); // Mud
-    Color line_color(0.5f, 0.9f, 0.4f, 1.0f);   // Edge highlight
     
     for (const auto& chunk : m_chunks) {
         if (chunk.visual_points.size() < 2) continue;
         
         for (usize i = 0; i < chunk.visual_points.size() - 1; ++i) {
-            // Draw bright green top edge
-            renderer.draw_line(chunk.visual_points[i], chunk.visual_points[i+1], line_color, 6.0f);
-            
-            // Draw Green Top Layer
-            std::vector<Vector2f> top_quad = {
+            // Draw Grass Top Layer with tiling vector texture
+            Vector2f grass_quad[4] = {
                 chunk.visual_points[i],
                 chunk.visual_points[i+1],
                 {chunk.visual_points[i+1].x, chunk.visual_points[i+1].y + TOP_LAYER_THICKNESS},
                 {chunk.visual_points[i].x, chunk.visual_points[i].y + TOP_LAYER_THICKNESS}
             };
-            renderer.draw_polygon(top_quad, ground_top);
 
-            // Draw Mud Bottom Layer
-            std::vector<Vector2f> bottom_quad = {
+            const float grass_tex_size = 128.0f; // Scale factor for grass tiling
+            Vector2f grass_uv[4] = {
+                { grass_quad[0].x / grass_tex_size, 0.0f },
+                { grass_quad[1].x / grass_tex_size, 0.0f },
+                { grass_quad[2].x / grass_tex_size, 1.0f },
+                { grass_quad[3].x / grass_tex_size, 1.0f }
+            };
+
+            if (m_grass_tex) {
+                renderer.draw_textured_quad(*m_grass_tex, grass_quad, grass_uv);
+            } else {
+                renderer.draw_polygon(std::vector<Vector2f>(grass_quad, grass_quad + 4), ground_top);
+            }
+
+            // Draw Mud Bottom Layer with tiling dirt texture
+            Vector2f pos_quad[4] = {
                 {chunk.visual_points[i].x, chunk.visual_points[i].y + TOP_LAYER_THICKNESS},
                 {chunk.visual_points[i+1].x, chunk.visual_points[i+1].y + TOP_LAYER_THICKNESS},
                 {chunk.visual_points[i+1].x, BOTTOM_Y},
                 {chunk.visual_points[i].x, BOTTOM_Y}
             };
-            renderer.draw_polygon(bottom_quad, ground_bottom);
+
+            // Calculate world-space UVs for tiling
+            const float tex_size = 512.0f; // Scale factor for tiling
+            Vector2f uv_quad[4] = {
+                { pos_quad[0].x / tex_size, pos_quad[0].y / tex_size },
+                { pos_quad[1].x / tex_size, pos_quad[1].y / tex_size },
+                { pos_quad[2].x / tex_size, pos_quad[2].y / tex_size },
+                { pos_quad[3].x / tex_size, pos_quad[3].y / tex_size }
+            };
+
+            if (m_dirt_tex) {
+                renderer.draw_textured_quad(*m_dirt_tex, pos_quad, uv_quad);
+            } else {
+                renderer.draw_polygon(std::vector<Vector2f>(pos_quad, pos_quad + 4), ground_bottom);
+            }
         }
     }
 }

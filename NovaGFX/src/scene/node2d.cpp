@@ -16,11 +16,14 @@ Transform2D Node2D::get_global_transform() const {
     return get_local_transform();
 }
 
-void Node2D::add_child(std::unique_ptr<Node2D> child) {
+Node2D* Node2D::add_child(std::unique_ptr<Node2D> child) {
     if (child) {
         child->m_parent = this;
+        Node2D* ptr = child.get();
         m_children.push_back(std::move(child));
+        return ptr;
     }
+    return nullptr;
 }
 
 void Node2D::update(f32 delta) {
@@ -32,6 +35,7 @@ void Node2D::draw(Renderer2D& renderer) {
 }
 
 void Node2D::update_tree(f32 delta) {
+    if (!visible) return;
     update(delta);
     for (auto& child : m_children) {
         child->update_tree(delta);
@@ -39,6 +43,7 @@ void Node2D::update_tree(f32 delta) {
 }
 
 void Node2D::draw_tree(Renderer2D& renderer) {
+    if (!visible) return;
     draw(renderer);
     for (auto& child : m_children) {
         child->draw_tree(renderer);

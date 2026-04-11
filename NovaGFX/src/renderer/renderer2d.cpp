@@ -129,6 +129,10 @@ Renderer2D::~Renderer2D() {
 }
 
 void Renderer2D::init_camera(Vector2f position, f32 zoom, Vector2f viewport_size) {
+    m_camera_pos = position;
+    m_camera_zoom = zoom;
+    m_viewport_size = viewport_size;
+
     if (zoom <= 0.0001f) zoom = 0.0001f;
     Vector2f size = viewport_size / zoom;
     Vector2f left_top = position - size * 0.5f;
@@ -400,9 +404,45 @@ void Renderer2D::draw_polygon_outline(std::span<const Vector2f> points, Color co
     draw_line(points.back(), points.front(), color, thickness);
 }
 
+void Renderer2D::draw_textured_quad(const Texture2D& tex, const Vector2f positions[4], const Vector2f uvs[4], Color tint) {
+    f32 tex_index = get_texture_index(&tex);
+    push_quad(positions, uvs, tint, tex_index);
+}
+
 void Renderer2D::draw_text(std::string_view text, Vector2f position, Color color, f32 size) {
     (void)text; (void)position; (void)color; (void)size;
     // Stub
+}
+
+void Renderer2D::set_clip_rect(Rect2f rect) {
+    flush(); 
+
+    // Transform world rect to screen pixels
+    // World space -> View space -> Screen pixels
+    Vector2f top_left_world = rect.position;
+    Vector2f bottom_right_world = rect.position + rect.size;
+
+    // View space (centered on camera)
+    Vector2f tl_view = (top_left_world - m_camera_pos) * m_camera_zoom;
+    Vector2f br_view = (bottom_right_world - m_camera_pos) * m_camera_zoom;
+
+    // Screen pixel space (0,0 is center) -> (0,0 is top-left)
+    Vector2f tl_screen = tl_view + m_viewport_size * 0.5f;
+    Vector2f br_screen = br_view + m_viewport_size * 0.5f;
+
+    // OpenGL Scissor uses bottom-left origin
+    f32 x = tl_screen.x;
+    f32 y = m_viewport_size.y - br_screen.y; 
+    f32 w = br_screen.x - tl_screen.x;
+    f32 h = br_screen.y - tl_screen.y;
+
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(static_cast<GLint>(x), static_cast<GLint>(y), static_cast<GLsizei>(w), static_cast<GLsizei>(h));
+}
+
+void Renderer2D::clear_clip_rect() {
+    flush();
+    glDisable(GL_SCISSOR_TEST);
 }
 
 } // namespace nova

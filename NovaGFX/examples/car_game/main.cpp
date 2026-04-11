@@ -38,14 +38,6 @@ int main() {
         Window window(1280, 720, "NovaGFX 2D Car Game");
         window.set_vsync(false);
         Renderer2D renderer;
-        PostProcessPipeline pp;
-        pp.init(1280, 720);
-        pp.set_aa_mode(PostProcessPipeline::AntiAliasingMode::MSAA);
-        pp.set_msaa_samples(4);
-        pp.set_bloom_enabled(true);
-        pp.set_bloom_intensity(0.6f);
-        pp.set_vignette_enabled(true);
-        pp.set_chromatic_aberration_enabled(true);
 
         // Box2D World
         b2Vec2 gravity(0.0f, 9.8f);
@@ -311,20 +303,7 @@ int main() {
             bool is_on_left_ui = mouse_pos.x < 300.0f;
             bool is_on_right_ui = mouse_pos.x > win_size.x - 320.0f;
 
-            // Cycle Anti-Aliasing Mode
-            if (Input::is_key_pressed(Key::A) && !is_on_left_ui && !is_on_right_ui) {
-                auto mode = pp.get_aa_mode();
-                if (mode == PostProcessPipeline::AntiAliasingMode::None) {
-                    pp.set_aa_mode(PostProcessPipeline::AntiAliasingMode::MSAA);
-                    std::cout << "AA Mode: MSAA (4x)\n";
-                } else if (mode == PostProcessPipeline::AntiAliasingMode::MSAA) {
-                    pp.set_aa_mode(PostProcessPipeline::AntiAliasingMode::FXAA);
-                    std::cout << "AA Mode: FXAA\n";
-                } else {
-                    pp.set_aa_mode(PostProcessPipeline::AntiAliasingMode::None);
-                    std::cout << "AA Mode: None\n";
-                }
-            }
+            // AA toggle removed with post-processing pipeline
 
             root_ui->update_ui_tree(delta, mouse_pos, mouse_pressed, mouse_released);
 
@@ -368,7 +347,7 @@ int main() {
             }
 
             // Handle resize for post-processing
-            pp.resize(win_size.x, win_size.y);
+            // pp.resize removed
 
             // Update Logic
             car.update(delta);
@@ -423,7 +402,7 @@ int main() {
             win_size = window.get_size();
             
             // Post-processing scene capture
-            pp.begin_scene();
+            // pp.begin_scene removed
             
             // Draw Sky Gradient Fake (clear color)
             glClearColor(0.5f, 0.7f, 0.9f, 1.0f);
@@ -463,8 +442,7 @@ int main() {
             // Render Scene
             renderer.end();
 
-            pp.end_scene();
-            pp.render();
+            // pp.end_scene/render removed
 
             // Render UI
             renderer.init_camera({win_size.x / 2.0f, win_size.y / 2.0f}, 1.0f, {(f32)win_size.x, (f32)win_size.y});

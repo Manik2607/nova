@@ -22,6 +22,8 @@ public:
 
     float bumpiness = 1.0f;
     float roughness = 1.5f;
+    std::shared_ptr<nova::Texture2D> m_dirt_tex;
+    std::shared_ptr<nova::Texture2D> m_grass_tex;
 
 private:
     b2World* m_world;

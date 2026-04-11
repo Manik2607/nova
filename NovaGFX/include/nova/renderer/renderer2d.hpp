@@ -58,10 +58,16 @@ public:
     void draw_polygon_outline(std::span<const Vector2f> points,
                               Color color, f32 thickness = 1.0f);
 
+    void draw_textured_quad(const Texture2D& tex, const Vector2f positions[4], const Vector2f uvs[4], Color tint = Color::WHITE());
+
     void draw_text(std::string_view text, Vector2f position, Color color,
                    f32 size); // stub
 
+    void set_clip_rect(Rect2f rect);
+    void clear_clip_rect();
+
     const FrameStats& get_stats() const { return m_stats; }
+    Vector2f get_viewport_size() const { return m_viewport_size; }
 
 private:
     void flush();
@@ -99,6 +105,10 @@ private:
 
     FrameStats m_stats;
     FrameStats m_stats_current;
+
+    Vector2f m_viewport_size{0, 0};
+    Vector2f m_camera_pos{0, 0};
+    f32 m_camera_zoom{1.0f};
 };
 
 } // namespace nova
