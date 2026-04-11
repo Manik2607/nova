@@ -37,6 +37,22 @@ void Game::update(f32 dt) {
         return;
     }
 
+    // Cycle Anti-Aliasing Mode
+    if (Input::is_key_pressed(Key::A)) {
+        auto& pp = m_neon.get_post_process();
+        auto mode = pp.get_aa_mode();
+        if (mode == PostProcessPipeline::AntiAliasingMode::None) {
+            pp.set_aa_mode(PostProcessPipeline::AntiAliasingMode::MSAA);
+            std::cout << "AA Mode: MSAA (4x)\n";
+        } else if (mode == PostProcessPipeline::AntiAliasingMode::MSAA) {
+            pp.set_aa_mode(PostProcessPipeline::AntiAliasingMode::FXAA);
+            std::cout << "AA Mode: FXAA\n";
+        } else {
+            pp.set_aa_mode(PostProcessPipeline::AntiAliasingMode::None);
+            std::cout << "AA Mode: None\n";
+        }
+    }
+
     // Get surface under car
     SurfaceType surface = m_track.get_tilemap().get_surface_at(m_car->get_position());
     f32 grip = get_grip_for_surface(surface);

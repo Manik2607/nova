@@ -11,6 +11,7 @@
 #include <nova/ui/button.hpp>
 #include <nova/ui/text_input.hpp>
 #include <nova/renderer/text_renderer.hpp>
+#include <nova/renderer/post_process.hpp>
 
 using namespace nova;
 
@@ -37,6 +38,14 @@ int main() {
         Window window(1280, 720, "NovaGFX 2D Car Game");
         window.set_vsync(false);
         Renderer2D renderer;
+        PostProcessPipeline pp;
+        pp.init(1280, 720);
+        pp.set_aa_mode(PostProcessPipeline::AntiAliasingMode::MSAA);
+        pp.set_msaa_samples(4);
+        pp.set_bloom_enabled(true);
+        pp.set_bloom_intensity(0.6f);
+        pp.set_vignette_enabled(true);
+        pp.set_chromatic_aberration_enabled(true);
 
         // Box2D World
         b2Vec2 gravity(0.0f, 9.8f);
@@ -233,29 +242,44 @@ int main() {
             root_ui->add_child(std::move(hdr));
             row_y += ROW_H;
         }
-
-        // Camera and Visuals
         Camera2D camera(1280.0f, 720.0f);
         camera.config.follow_lerp = 4.0f;
         camera.config.lookahead_dist = 400.0f;
         camera.config.lookahead_lerp = 2.0f;
-        camera.set_zoom(0.333f);
         camera.set_position({0, 0});
 
-        ParticleSystem particles(1024);
+        auto inp = std::make_unique<ui::TextInput>(&text_renderer, "", ui::InputMode::FLOAT);
+        auto inp_ptr = inp.get();
+        inp->step = 0.1f;
+        inp->set_float(0.1, 2);
+        inp->position = {panel_x + LABEL_W, row_y};
+        inp->size     = {INPUT_W, ROW_H};
+        inp->font_size = FONT_SZ;
+        inp->color_bg_normal  = {0.08f, 0.08f, 0.12f, 0.9f};
+        inp->color_bg_focused = {0.15f, 0.15f, 0.25f, 1.0f};
+        inp->color_border     = {0.4f, 0.6f, 1.0f, 0.8f};
+        inp->on_committed = [&camera](const std::string& s){ 
+            try { camera.set_zoom(std::stof(s)); } catch(...) {} 
+        };
+        right_controls.push_back({inp_ptr, inp_ptr->position.x - (1280.0f - 300.0f)});
+        root_ui->add_child(std::move(inp));
+        row_y += ROW_H;
+        // Camera and Visuals
+
+        ParticleSystem particles(3000);
         ParticleEmitter smoke;
         smoke.velocity_min = 20.0f;
         smoke.velocity_max = 60.0f;
         smoke.spread_angle = 1.0f; 
         smoke.lifetime_min = 0.4f;
         smoke.lifetime_max = 1.0f;
-        smoke.size_start = 15.0f;
-        smoke.size_end = 45.0f;
+        smoke.size_start = 30.0f;
+        smoke.size_end = 80.0f;
         smoke.color_start = Color(0.8f, 0.8f, 0.8f, 0.5f);
         smoke.color_end = Color(0.5f, 0.5f, 0.5f, 0.0f);
         smoke.drag = 2.5f;
         smoke.mode = EmitterMode::CONTINUOUS;
-        smoke.rate = 0.0f;
+        smoke.rate = 100.0f;
         smoke.active = true;
         usize smoke_id = particles.add_emitter(smoke);
 
@@ -283,15 +307,31 @@ int main() {
             Vector2f mouse_pos = Input::get_mouse_position();
             bool mouse_pressed = Input::is_mouse_pressed(MouseButton::LEFT);
             bool mouse_released = Input::is_mouse_released(MouseButton::LEFT);
+
+            bool is_on_left_ui = mouse_pos.x < 300.0f;
+            bool is_on_right_ui = mouse_pos.x > win_size.x - 320.0f;
+
+            // Cycle Anti-Aliasing Mode
+            if (Input::is_key_pressed(Key::A) && !is_on_left_ui && !is_on_right_ui) {
+                auto mode = pp.get_aa_mode();
+                if (mode == PostProcessPipeline::AntiAliasingMode::None) {
+                    pp.set_aa_mode(PostProcessPipeline::AntiAliasingMode::MSAA);
+                    std::cout << "AA Mode: MSAA (4x)\n";
+                } else if (mode == PostProcessPipeline::AntiAliasingMode::MSAA) {
+                    pp.set_aa_mode(PostProcessPipeline::AntiAliasingMode::FXAA);
+                    std::cout << "AA Mode: FXAA\n";
+                } else {
+                    pp.set_aa_mode(PostProcessPipeline::AntiAliasingMode::None);
+                    std::cout << "AA Mode: None\n";
+                }
+            }
+
             root_ui->update_ui_tree(delta, mouse_pos, mouse_pressed, mouse_released);
 
             Vector2f world_m;
             world_m.x = camera.get_position().x + (mouse_pos.x - win_size.x / 2.0f) / camera.get_zoom();
             world_m.y = camera.get_position().y + (mouse_pos.y - win_size.y / 2.0f) / camera.get_zoom();
             b2Vec2 p(world_m.x / PIXELS_PER_METER, world_m.y / PIXELS_PER_METER);
-
-            bool is_on_left_ui = mouse_pos.x < 300.0f;
-            bool is_on_right_ui = mouse_pos.x > win_size.x - 320.0f;
 
             if (mouse_pressed && !is_on_left_ui && !is_on_right_ui) { // Ignore UI clicks
                 if (mouseJoint) { world.DestroyJoint(mouseJoint); mouseJoint = nullptr; }
@@ -326,6 +366,9 @@ int main() {
             if (Input::is_key_pressed(Key::ESCAPE)) {
                 window.close();
             }
+
+            // Handle resize for post-processing
+            pp.resize(win_size.x, win_size.y);
 
             // Update Logic
             car.update(delta);
@@ -378,7 +421,9 @@ int main() {
 
             // Rendering setup
             win_size = window.get_size();
-            glViewport(0, 0, win_size.x, win_size.y);
+            
+            // Post-processing scene capture
+            pp.begin_scene();
             
             // Draw Sky Gradient Fake (clear color)
             glClearColor(0.5f, 0.7f, 0.9f, 1.0f);
@@ -417,6 +462,9 @@ int main() {
 
             // Render Scene
             renderer.end();
+
+            pp.end_scene();
+            pp.render();
 
             // Render UI
             renderer.init_camera({win_size.x / 2.0f, win_size.y / 2.0f}, 1.0f, {(f32)win_size.x, (f32)win_size.y});

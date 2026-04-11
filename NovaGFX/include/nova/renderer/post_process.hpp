@@ -30,15 +30,27 @@ public:
     PostProcessPipeline() = default;
     ~PostProcessPipeline() = default;
 
+    enum class AntiAliasingMode {
+        None,
+        MSAA,
+        FXAA
+    };
+
     void init(i32 width, i32 height);
     void resize(i32 width, i32 height);
 
-    /// Call before rendering the scene — redirects to internal FBO.
+    /// Call before rendering the scene — redirects to internal FBO (multisampled if MSAA is on).
     void begin_scene();
-    /// Call after rendering the scene.
+    /// Call after rendering the scene. Resolves MSAA if needed.
     void end_scene();
     /// Run all post-process passes and output to the default framebuffer.
     void render();
+
+    // Anti-Aliasing
+    void set_aa_mode(AntiAliasingMode mode);
+    void set_msaa_samples(i32 samples);
+    AntiAliasingMode get_aa_mode() const { return m_aa_mode; }
+    i32 get_msaa_samples() const { return m_msaa_samples; }
 
     // Bloom
     void set_bloom_enabled(bool v) { m_bloom_enabled = v; }
@@ -57,27 +69,33 @@ public:
     bool is_initialized() const { return m_initialized; }
 
 private:
+    void update_fbos();
     void init_fullscreen_quad();
     void draw_fullscreen_quad();
 
     bool m_initialized = false;
     i32 m_width = 0, m_height = 0;
 
-    // FBOs: scene, bloom ping-pong, final
-    Framebuffer m_scene_fbo;
+    // FBOs
+    Framebuffer m_scene_fbo;    // Source (could be MSAA)
+    Framebuffer m_resolve_fbo;  // Resolved source (regular texture)
     Framebuffer m_bloom_fbo[2]; // ping-pong for blur
-    Framebuffer m_final_fbo;
+    Framebuffer m_final_fbo;    // Intermediate for multi-pass PP
 
     // Shaders
     std::unique_ptr<Shader> m_bloom_extract_shader;
     std::unique_ptr<Shader> m_bloom_blur_shader;
     std::unique_ptr<Shader> m_composite_shader;
+    std::unique_ptr<Shader> m_fxaa_shader;
 
     // Fullscreen quad
     u32 m_quad_vao = 0;
     u32 m_quad_vbo = 0;
 
     // Settings
+    AntiAliasingMode m_aa_mode = AntiAliasingMode::MSAA;
+    i32 m_msaa_samples = 4;
+
     bool m_bloom_enabled = true;
     f32 m_bloom_threshold = 0.7f;
     f32 m_bloom_intensity = 1.2f;

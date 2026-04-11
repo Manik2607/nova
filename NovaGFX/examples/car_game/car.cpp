@@ -161,12 +161,13 @@ void Car::draw(Renderer2D& renderer) {
         Vector2f pcenter = {wpos.x * PIXELS_PER_METER, wpos.y * PIXELS_PER_METER};
         float radius = circle->m_radius * PIXELS_PER_METER;
         
-        renderer.draw_circle(pcenter, radius, Color(0.2f, 0.2f, 0.2f, 1.0f), 24);
-        renderer.draw_circle_outline(pcenter, radius, Color::BLACK(), 2.0f, 24);
+        // Draw wheel with NEON glow (values > 1.0 trigger bloom)
+        renderer.draw_circle(pcenter, radius, Color(0.0f, 2.5f, 5.0f, 1.0f), 24);
+        renderer.draw_circle_outline(pcenter, radius, Color(0.0f, 4.0f, 8.0f, 1.0f), 3.0f, 24);
         
         // Draw spoke
         Vector2f end_p = pcenter + Vector2f{std::cos(wangle) * radius, std::sin(wangle) * radius};
-        renderer.draw_line(pcenter, end_p, Color::GRAY(), 3.0f);
+        renderer.draw_line(pcenter, end_p, Color(0.2f, 3.0f, 6.0f, 1.0f), 3.0f);
     };
 
     draw_wheel(m_rear_wheel);
@@ -203,7 +204,8 @@ void Car::draw(Renderer2D& renderer) {
 
     // --- DEBUG COLLIDER RENDERING ---
     // Draw the physics shapes as outlines so we can see if they match the image
-    b2Fixture* f = m_chassis->GetFixtureList();
+    // disabled it
+    b2Fixture* f = nullptr;
     while (f) {
         if (f->GetShape()->GetType() == b2Shape::e_polygon) {
             b2PolygonShape* poly = (b2PolygonShape*)f->GetShape();

@@ -74,7 +74,7 @@ void TextInput::draw(Renderer2D& renderer) {
             renderer.draw_rect(btn_base, {BTN_W, btn_h}, dec_col);
             renderer.draw_rect_outline(btn_base, {BTN_W, btn_h}, color_border, 1.0f);
             f32 lbl_w = measure_txt("-", font_size);
-            draw_txt("-", btn_base + Vector2f{(BTN_W - lbl_w) * 0.5f, (btn_h - font_size) * 0.5f},
+            draw_txt("-", btn_base + Vector2f{(BTN_W - lbl_w) * 0.5f, (btn_h + font_size) * 0.40f},
                      font_size, color_text);
 
             // Increase (+) button
@@ -84,7 +84,7 @@ void TextInput::draw(Renderer2D& renderer) {
             renderer.draw_rect(inc_pos, {BTN_W, btn_h}, inc_col);
             renderer.draw_rect_outline(inc_pos, {BTN_W, btn_h}, color_border, 1.0f);
             lbl_w = measure_txt("+", font_size);
-            draw_txt("+", inc_pos + Vector2f{(BTN_W - lbl_w) * 0.5f, (btn_h - font_size) * 0.5f},
+            draw_txt("+", inc_pos + Vector2f{(BTN_W - lbl_w) * 0.5f, (btn_h + font_size) * 0.40f},
                      font_size, color_text);
         }
 

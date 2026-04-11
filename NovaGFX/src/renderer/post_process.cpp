@@ -118,20 +118,75 @@ void main() {
 }
 )";
 
+static const char* FXAA_FRAG = R"(
+#version 330 core
+out vec4 FragColor;
+in vec2 v_TexCoord;
+
+uniform sampler2D u_Scene;
+uniform vec2 u_TexelSize;
+
+// FXAA Settings
+#define FXAA_REDUCE_MIN   (1.0/128.0)
+#define FXAA_REDUCE_MUL   (1.0/8.0)
+#define FXAA_SPAN_MAX     8.0
+
+void main() {
+    vec3 rgbNW = texture(u_Scene, v_TexCoord + vec2(-1.0, -1.0) * u_TexelSize).rgb;
+    vec3 rgbNE = texture(u_Scene, v_TexCoord + vec2(1.0, -1.0) * u_TexelSize).rgb;
+    vec3 rgbSW = texture(u_Scene, v_TexCoord + vec2(-1.0, 1.0) * u_TexelSize).rgb;
+    vec3 rgbSE = texture(u_Scene, v_TexCoord + vec2(1.0, 1.0) * u_TexelSize).rgb;
+    vec3 rgbM  = texture(u_Scene, v_TexCoord).rgb;
+
+    vec3 luma = vec3(0.299, 0.587, 0.114);
+    float lumaNW = dot(rgbNW, luma);
+    float lumaNE = dot(rgbNE, luma);
+    float lumaSW = dot(rgbSW, luma);
+    float lumaSE = dot(rgbSE, luma);
+    float lumaM  = dot(rgbM,  luma);
+
+    float lumaMin = min(lumaM, min(min(lumaNW, lumaNE), min(lumaSW, lumaSE)));
+    float lumaMax = max(lumaM, max(max(lumaNW, lumaNE), max(lumaSW, lumaSE)));
+
+    vec2 dir;
+    dir.x = -((lumaNW + lumaNE) - (lumaSW + lumaSE));
+    dir.y =  ((lumaNW + lumaSW) - (lumaNE + lumaSE));
+
+    float dirReduce = max((lumaNW + lumaNE + lumaSW + lumaSE) * (0.25 * FXAA_REDUCE_MUL), FXAA_REDUCE_MIN);
+    float rcpDirMin = 1.0 / (min(abs(dir.x), abs(dir.y)) + dirReduce);
+
+    dir = min(vec2(FXAA_SPAN_MAX, FXAA_SPAN_MAX),
+          max(vec2(-FXAA_SPAN_MAX, -FXAA_SPAN_MAX),
+          dir * rcpDirMin)) * u_TexelSize;
+
+    vec3 rgbA = 0.5 * (
+        texture(u_Scene, v_TexCoord + dir * (1.0/3.0 - 0.5)).rgb +
+        texture(u_Scene, v_TexCoord + dir * (2.0/3.0 - 0.5)).rgb);
+    vec3 rgbB = rgbA * 0.5 + 0.25 * (
+        texture(u_Scene, v_TexCoord + dir * -0.5).rgb +
+        texture(u_Scene, v_TexCoord + dir * 0.5).rgb);
+
+    float lumaB = dot(rgbB, luma);
+    if ((lumaB < lumaMin) || (lumaB > lumaMax)) {
+        FragColor = vec4(rgbA, 1.0);
+    } else {
+        FragColor = vec4(rgbB, 1.0);
+    }
+}
+)";
+
 // ── Implementation ──────────────────────────────────────────────────────
 
 void PostProcessPipeline::init(i32 width, i32 height) {
     m_width = width;
     m_height = height;
 
-    m_scene_fbo.create(width, height);
-    m_bloom_fbo[0].create(width / 2, height / 2);
-    m_bloom_fbo[1].create(width / 2, height / 2);
-    m_final_fbo.create(width, height);
+    update_fbos();
 
     m_bloom_extract_shader = std::make_unique<Shader>(FULLSCREEN_VERT, BLOOM_EXTRACT_FRAG);
     m_bloom_blur_shader = std::make_unique<Shader>(FULLSCREEN_VERT, BLOOM_BLUR_FRAG);
     m_composite_shader = std::make_unique<Shader>(FULLSCREEN_VERT, COMPOSITE_FRAG);
+    m_fxaa_shader = std::make_unique<Shader>(FULLSCREEN_VERT, FXAA_FRAG);
 
     init_fullscreen_quad();
     m_initialized = true;
@@ -141,10 +196,16 @@ void PostProcessPipeline::resize(i32 width, i32 height) {
     if (width == m_width && height == m_height) return;
     m_width = width;
     m_height = height;
-    m_scene_fbo.resize(width, height);
-    m_bloom_fbo[0].resize(width / 2, height / 2);
-    m_bloom_fbo[1].resize(width / 2, height / 2);
-    m_final_fbo.resize(width, height);
+    update_fbos();
+}
+
+void PostProcessPipeline::update_fbos() {
+    i32 samples = (m_aa_mode == AntiAliasingMode::MSAA) ? m_msaa_samples : 1;
+    m_scene_fbo.create(m_width, m_height, samples);
+    m_resolve_fbo.create(m_width, m_height, 1);
+    m_bloom_fbo[0].create(m_width / 2, m_height / 2, 1);
+    m_bloom_fbo[1].create(m_width / 2, m_height / 2, 1);
+    m_final_fbo.create(m_width, m_height, 1);
 }
 
 void PostProcessPipeline::begin_scene() {
@@ -154,15 +215,21 @@ void PostProcessPipeline::begin_scene() {
 
 void PostProcessPipeline::end_scene() {
     m_scene_fbo.unbind();
+    if (m_aa_mode == AntiAliasingMode::MSAA) {
+        m_scene_fbo.resolve(m_resolve_fbo);
+    }
 }
 
 void PostProcessPipeline::render() {
-    u32 scene_tex = m_scene_fbo.get_color_texture();
+    u32 scene_tex = (m_aa_mode == AntiAliasingMode::MSAA) 
+        ? m_resolve_fbo.get_color_texture() 
+        : m_scene_fbo.get_color_texture();
+    
     u32 bloom_tex = 0;
 
     // Bloom pass
     if (m_bloom_enabled) {
-        // 1. Extract bright pixels
+        // ... (keep bloom same as before but use correct scene_tex)
         m_bloom_fbo[0].bind();
         glClear(GL_COLOR_BUFFER_BIT);
         m_bloom_extract_shader->bind();
@@ -173,7 +240,6 @@ void PostProcessPipeline::render() {
         draw_fullscreen_quad();
         m_bloom_extract_shader->unbind();
 
-        // 2. Gaussian blur ping-pong (4 passes)
         bool horizontal = true;
         for (int i = 0; i < 4; i++) {
             int dst = horizontal ? 1 : 0;
@@ -193,26 +259,29 @@ void PostProcessPipeline::render() {
             m_bloom_blur_shader->unbind();
             horizontal = !horizontal;
         }
-
-        bloom_tex = m_bloom_fbo[0].get_color_texture(); // last write was to fbo[0]
+        bloom_tex = m_bloom_fbo[0].get_color_texture();
     }
 
-    // Composite pass: scene + bloom + vignette + chroma → default framebuffer
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, m_width, m_height);
-    glClear(GL_COLOR_BUFFER_BIT);
+    // Determine target for composite
+    bool use_fxaa = (m_aa_mode == AntiAliasingMode::FXAA);
+    if (use_fxaa) {
+        m_final_fbo.bind();
+        glClear(GL_COLOR_BUFFER_BIT);
+    } else {
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, m_width, m_height);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
 
+    // Composite pass
     m_composite_shader->bind();
     m_composite_shader->set_int("u_Scene", 0);
     m_composite_shader->set_int("u_Bloom", 1);
-
     m_composite_shader->set_bool("u_BloomEnabled", m_bloom_enabled);
     m_composite_shader->set_float("u_BloomIntensity", m_bloom_intensity);
-
     m_composite_shader->set_bool("u_VignetteEnabled", m_vignette_enabled);
     m_composite_shader->set_float("u_VignetteIntensity", m_vignette_intensity);
     m_composite_shader->set_float("u_VignetteRadius", m_vignette_radius);
-
     m_composite_shader->set_bool("u_ChromaEnabled", m_chroma_enabled);
     m_composite_shader->set_float("u_ChromaStrength", m_chroma_strength);
 
@@ -223,12 +292,37 @@ void PostProcessPipeline::render() {
 
     draw_fullscreen_quad();
     m_composite_shader->unbind();
+
+    // FXAA pass if enabled
+    if (use_fxaa) {
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, m_width, m_height);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        m_fxaa_shader->bind();
+        m_fxaa_shader->set_int("u_Scene", 0);
+        m_fxaa_shader->set_vec2("u_TexelSize", {1.0f / m_width, 1.0f / m_height});
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, m_final_fbo.get_color_texture());
+        draw_fullscreen_quad();
+        m_fxaa_shader->unbind();
+    }
+}
+
+void PostProcessPipeline::set_aa_mode(AntiAliasingMode mode) {
+    if (m_aa_mode == mode) return;
+    m_aa_mode = mode;
+    if (m_initialized) update_fbos();
+}
+
+void PostProcessPipeline::set_msaa_samples(i32 samples) {
+    if (m_msaa_samples == samples) return;
+    m_msaa_samples = samples;
+    if (m_initialized && m_aa_mode == AntiAliasingMode::MSAA) update_fbos();
 }
 
 void PostProcessPipeline::init_fullscreen_quad() {
-    // NDC fullscreen quad
     float vertices[] = {
-        // pos       // uv
         -1.0f, -1.0f, 0.0f, 0.0f,
          1.0f, -1.0f, 1.0f, 0.0f,
          1.0f,  1.0f, 1.0f, 1.0f,

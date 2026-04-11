@@ -8,7 +8,7 @@ void Label::draw(Renderer2D& renderer) {
         if (font_override) {
             text_renderer->draw_text_with_font(renderer, *font_override, text, global.origin, font_size, color);
         } else {
-            text_renderer->draw_text(renderer, text, global.origin, font_size, color);
+            text_renderer->draw_text(renderer, text, global.origin + Vector2f{0.0f, font_size}, font_size, color);
         }
     }
 }
