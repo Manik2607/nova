@@ -15,6 +15,21 @@ Car::Car(b2World* world, Vector2f start_pos, std::shared_ptr<Texture2D> texture)
     rebuild_physics();
 }
 
+void Car::reset_car(Vector2f pos) {
+    b2Vec2 p(pos.x / PIXELS_PER_METER, pos.y / PIXELS_PER_METER);
+    m_chassis->SetTransform(p, 0.0f);
+    m_chassis->SetLinearVelocity({0, 0});
+    m_chassis->SetAngularVelocity(0);
+    
+    // Reset wheels too
+    m_rear_wheel->SetTransform(p, 0.0f);
+    m_front_wheel->SetTransform(p, 0.0f);
+    m_rear_wheel->SetLinearVelocity({0, 0});
+    m_front_wheel->SetLinearVelocity({0, 0});
+    
+    rebuild_physics(); // Re-anchor wheels correctly
+}
+
 void Car::rebuild_physics() {
     b2Vec2 pos = m_chassis->GetPosition();
     float angle = m_chassis->GetAngle();
@@ -126,21 +141,46 @@ void Car::rebuild_physics() {
 }
 
 void Car::update(f32 dt) {
-    (void)dt;
     bool has_input = false;
+    float steering = 0.0f;
 
     if (Input::is_key_down(Key::D) || Input::is_key_down(Key::RIGHT)) {
         m_motor_speed += motor_accel * dt;
         has_input = true;
+        steering = 1.0f;
     } else if (Input::is_key_down(Key::A) || Input::is_key_down(Key::LEFT)) {
         m_motor_speed -= motor_accel * dt;
         has_input = true;
+        steering = -1.0f;
     } else {
         m_motor_speed = m_rear_wheel->GetAngularVelocity();
     }
 
     if (m_motor_speed >  max_speed) m_motor_speed =  max_speed;
     if (m_motor_speed < -max_speed) m_motor_speed = -max_speed;
+
+    // --- Air State Detection ---
+    auto is_touching = [](b2Body* body) {
+        if (!body) return false;
+        for (b2ContactEdge* ce = body->GetContactList(); ce; ce = ce->next) {
+            if (ce->contact->IsTouching()) return true;
+        }
+        return false;
+    };
+
+    bool rear_on_ground = is_touching(m_rear_wheel);
+    bool front_on_ground = is_touching(m_front_wheel);
+    bool chassis_on_ground = is_touching(m_chassis);
+    bool in_air = !rear_on_ground && !front_on_ground && !chassis_on_ground;
+
+    if (in_air) {
+        m_chassis->SetAngularDamping(air_damping);
+        if (has_input) {
+            m_chassis->ApplyTorque(-steering * air_torque, true);
+        }
+    } else {
+        m_chassis->SetAngularDamping(0.5f); // Base damping on ground
+    }
 
     m_rear_joint->EnableMotor(has_input);
     m_front_joint->EnableMotor(has_input);

@@ -32,8 +32,8 @@ namespace {
 }
 
 TerrainGenerator::TerrainGenerator(b2World* world) : m_world(world) {
-    m_dirt_tex = std::make_shared<Texture2D>("examples/car_game/Images/dirt.png");
-    m_grass_tex = std::make_shared<Texture2D>("examples/car_game/Images/grass.png");
+    m_dirt_tex = std::make_shared<Texture2D>("examples/car_game/Images/PenDirt.jpg");
+    m_grass_tex = std::make_shared<Texture2D>("examples/car_game/Images/PenGrass.png");
     // Generate initial chunks
     while (m_last_generated_x < MAX_GENERATE_AHEAD) {
         generate_chunk();
@@ -62,7 +62,7 @@ float TerrainGenerator::get_height(float x) {
     float sharp_bump_mask = std::max(0.0f, noise(x * 0.15f * roughness + 456.7f) - 0.8f) * 5.0f;
     y += (noise(x * 3.0f * roughness) - 0.5f) * 1.0f * sharp_bump_mask * bumpiness;
     
-    return y + 10.0f; // Base offset
+    return y + 11.5f; // Base offset (Moved down slightly from 10.0f)
 }
 
 void TerrainGenerator::generate_chunk() {
@@ -147,38 +147,14 @@ void TerrainGenerator::reset(float start_x) {
 
 void TerrainGenerator::draw(Renderer2D& renderer) {
     const float BOTTOM_Y = 3000.0f; // Deep Y coordinate in pixels
-    const float TOP_LAYER_THICKNESS = 40.0f; // Pixels
+    const float TOP_LAYER_THICKNESS = 60.0f; // Pixels
     
     Color ground_top(0.3f, 0.7f, 0.2f, 1.0f);   // Bright Green grass
     Color ground_bottom(0.25f, 0.15f, 0.05f, 1.0f); // Mud
     
     for (const auto& chunk : m_chunks) {
-        if (chunk.visual_points.size() < 2) continue;
-        
         for (usize i = 0; i < chunk.visual_points.size() - 1; ++i) {
-            // Draw Grass Top Layer with tiling vector texture
-            Vector2f grass_quad[4] = {
-                chunk.visual_points[i],
-                chunk.visual_points[i+1],
-                {chunk.visual_points[i+1].x, chunk.visual_points[i+1].y + TOP_LAYER_THICKNESS},
-                {chunk.visual_points[i].x, chunk.visual_points[i].y + TOP_LAYER_THICKNESS}
-            };
-
-            const float grass_tex_size = 128.0f; // Scale factor for grass tiling
-            Vector2f grass_uv[4] = {
-                { grass_quad[0].x / grass_tex_size, 0.0f },
-                { grass_quad[1].x / grass_tex_size, 0.0f },
-                { grass_quad[2].x / grass_tex_size, 1.0f },
-                { grass_quad[3].x / grass_tex_size, 1.0f }
-            };
-
-            if (m_grass_tex) {
-                renderer.draw_textured_quad(*m_grass_tex, grass_quad, grass_uv);
-            } else {
-                renderer.draw_polygon(std::vector<Vector2f>(grass_quad, grass_quad + 4), ground_top);
-            }
-
-            // Draw Mud Bottom Layer with tiling dirt texture
+            // 1. Draw Mud Bottom Layer with tiling dirt texture (Background)
             Vector2f pos_quad[4] = {
                 {chunk.visual_points[i].x, chunk.visual_points[i].y + TOP_LAYER_THICKNESS},
                 {chunk.visual_points[i+1].x, chunk.visual_points[i+1].y + TOP_LAYER_THICKNESS},
@@ -186,8 +162,7 @@ void TerrainGenerator::draw(Renderer2D& renderer) {
                 {chunk.visual_points[i].x, BOTTOM_Y}
             };
 
-            // Calculate world-space UVs for tiling
-            const float tex_size = 512.0f; // Scale factor for tiling
+            const float tex_size = 512.0f; 
             Vector2f uv_quad[4] = {
                 { pos_quad[0].x / tex_size, pos_quad[0].y / tex_size },
                 { pos_quad[1].x / tex_size, pos_quad[1].y / tex_size },
@@ -199,6 +174,33 @@ void TerrainGenerator::draw(Renderer2D& renderer) {
                 renderer.draw_textured_quad(*m_dirt_tex, pos_quad, uv_quad);
             } else {
                 renderer.draw_polygon(std::vector<Vector2f>(pos_quad, pos_quad + 4), ground_bottom);
+            }
+
+            // 2. Draw Grass Top Layer with tiling texture (Foreground - Overlaps Mud)
+            const float grass_h_scale = 512.0f; // Stretched further horizontally
+            const float grass_v_scale = 1.0f;   
+            const float grass_v_offset = 0.0f; 
+            const float grass_y_offset = -15.0f; 
+            const float grass_overlap = 30.0f;   
+            
+            Vector2f grass_quad[4] = {
+                {chunk.visual_points[i].x, chunk.visual_points[i].y + grass_y_offset},
+                {chunk.visual_points[i+1].x, chunk.visual_points[i+1].y + grass_y_offset},
+                {chunk.visual_points[i+1].x, chunk.visual_points[i+1].y + TOP_LAYER_THICKNESS + grass_y_offset + grass_overlap},
+                {chunk.visual_points[i].x, chunk.visual_points[i].y + TOP_LAYER_THICKNESS + grass_y_offset + grass_overlap}
+            };
+            
+            Vector2f grass_uv[4] = {
+                { grass_quad[0].x / grass_h_scale, grass_v_offset },
+                { grass_quad[1].x / grass_h_scale, grass_v_offset },
+                { grass_quad[2].x / grass_h_scale, grass_v_offset + grass_v_scale },
+                { grass_quad[3].x / grass_h_scale, grass_v_offset + grass_v_scale }
+            };
+
+            if (m_grass_tex) {
+                renderer.draw_textured_quad(*m_grass_tex, grass_quad, grass_uv);
+            } else {
+                renderer.draw_polygon(std::vector<Vector2f>(grass_quad, grass_quad + 4), ground_top);
             }
         }
     }

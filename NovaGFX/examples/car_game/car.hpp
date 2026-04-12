@@ -12,6 +12,7 @@ public:
     void draw(nova::Renderer2D& renderer);
     void set_motor_torque(float torque);
     void set_suspension(float frequency_hz, float damping_ratio);
+    void reset_car(nova::Vector2f pos);
 
     nova::Vector2f get_position() const;
     nova::Vector2f get_rear_wheel_position() const;
@@ -28,6 +29,8 @@ public:
     float max_speed = 50.0f;      // rad/s (motor)
     float motor_accel = 100.0f;   // rad/s^2
     float motor_torque = 450.0f;
+    float air_torque = 150.0f;    // Torque applied when airborne
+    float air_damping = 2.0f;     // Angular damping when airborne
 
     float susp_hz = 10.0f;
     float susp_damp = 0.40f;
