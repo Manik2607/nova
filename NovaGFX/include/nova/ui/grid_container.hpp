@@ -1,5 +1,7 @@
 #pragma once
 #include "nova/ui/control.hpp"
+#include <algorithm>
+#include <vector>
 
 namespace nova::ui {
 
@@ -8,68 +10,61 @@ public:
     int columns{2};
     f32 h_spacing{5.0f};
     f32 v_spacing{5.0f};
-    f32 spacing{5.0f}; // convenience for both
+    f32 spacing{5.0f}; // convenience — synced in layout
 
     void layout_children() override {
-        h_spacing = v_spacing = spacing; // Sync with convenience field
+        h_spacing = v_spacing = spacing;
         if (m_children.empty()) return;
 
+        // Collect visible children
+        std::vector<Control*> children;
+        for (auto& cr : m_children) {
+            Control* c = dynamic_cast<Control*>(cr.get());
+            if (c && c->visible) children.push_back(c);
+        }
+        if (children.empty()) return;
+
+        // Available inner width (respect padding)
+        f32 avail_w = size.x - padding.x - padding.z;
+        // Compute uniform column width
+        int cols = std::max(1, columns);
+        f32 col_w = (avail_w - (cols - 1) * h_spacing) / cols;
+
+        // First pass: set widths and compute per-row heights
         std::vector<f32> row_heights;
-        std::vector<f32> col_widths(columns, 0.0f);
-
-        // First pass: calculate dimensions
-        f32 available_width = size.x - padding.x - padding.z;
-        f32 adaptive_col_width = (available_width - (columns - 1) * h_spacing) / columns;
-
         int i = 0;
-        for (auto& child_raw : m_children) {
-            Control* child = dynamic_cast<Control*>(child_raw.get());
-            if (!child || !child->visible) continue;
+        for (Control* c : children) {
+            int col = i % cols;
+            int row = i / cols;
 
-            int col = i % columns;
-            int row = i / columns;
-            
-            if (row >= (int)row_heights.size()) row_heights.push_back(0);
-            
-            // If the container has a set width (e.g. from expand or manual), use adaptive width
-            if (available_width > 0) {
-                child->size.x = adaptive_col_width;
-            }
-            
-            col_widths[col] = std::max(col_widths[col], child->size.x);
-            row_heights[row] = std::max(row_heights[row], child->size.y);
+            if (avail_w > 0) c->size.x = std::max(0.0f, col_w);
+
+            if (row >= (int)row_heights.size()) row_heights.push_back(0.0f);
+            row_heights[row] = std::max(row_heights[row], c->size.y);
+
             i++;
         }
 
         // Second pass: position children
         i = 0;
-        Vector2f current_pos = {padding.x, padding.y};
-        for (auto& child_raw : m_children) {
-            Control* child = dynamic_cast<Control*>(child_raw.get());
-            if (!child || !child->visible) continue;
-
-            int col = i % columns;
-            int row = i / columns;
-
-            child->position = current_pos;
-
-            if (col < columns - 1) {
-                current_pos.x += col_widths[col] + h_spacing;
-            } else {
-                current_pos.x = padding.x;
-                current_pos.y += row_heights[row] + v_spacing;
+        f32 cy = padding.y;
+        for (int row = 0; row < (int)row_heights.size(); ++row) {
+            f32 cx = padding.x;
+            for (int col = 0; col < cols && i < (int)children.size(); ++col, ++i) {
+                children[i]->position = {cx, cy};
+                children[i]->layout_children();
+                cx += col_w + h_spacing;
             }
-            i++;
+            cy += row_heights[row] + v_spacing;
         }
-        
-        // Auto-size
-        size.x = padding.x + padding.z;
-        for (f32 w : col_widths) size.x += w + h_spacing;
-        if (!col_widths.empty()) size.x -= h_spacing;
-        
-        size.y = padding.y + padding.w;
-        for (f32 h : row_heights) size.y += h + v_spacing;
-        if (!row_heights.empty()) size.y -= v_spacing;
+
+        // Auto-size only if we are not set to expand (preserve parent-given size)
+        if (!expand) {
+            size.x = padding.x + padding.z + cols * col_w + (cols - 1) * h_spacing;
+            size.y = padding.y + padding.w;
+            for (f32 h : row_heights) size.y += h + v_spacing;
+            if (!row_heights.empty()) size.y -= v_spacing;
+        }
     }
 };
 

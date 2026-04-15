@@ -13,6 +13,7 @@
 #include <nova/ui/box_container.hpp>
 #include <nova/ui/tab_bar.hpp>
 #include <nova/ui/panel.hpp>
+#include <nova/ui/scroll_view.hpp>
 #include <nova/renderer/text_renderer.hpp>
 #include <nova/renderer/post_process.hpp>
 
@@ -58,6 +59,8 @@ int main() {
 
         // ── DASHBOARD UI (Modern Layout) ───────────────────────────────────
         TextRenderer text_renderer;
+        bool show_ui = true;
+
         auto root_hbox = std::make_unique<ui::HBoxContainer>();
         root_hbox->size = {1280.0f, 720.0f};
         root_hbox->anchor = ui::Anchor::FILL;
@@ -65,7 +68,7 @@ int main() {
         // Sidebar Panel
         auto side_panel = root_hbox->add_child<ui::Panel>();
         side_panel->size = {320, 0};
-        side_panel->expand = true; // fill vertical
+        side_panel->expand = false; // Stay at 320px
         side_panel->background_color = {0.05f, 0.05f, 0.07f, 0.95f};
         side_panel->padding = {15, 20, 15, 20};
 
@@ -82,9 +85,12 @@ int main() {
         tabs->size.y = 40.0f; // Give some height to tab buttons
 
         // Dedicated container for tab pages to prevent stacking
-        auto tab_content = side_vbox->add_child<Panel>();
-        tab_content->expand = true;
-        tab_content->background_color = {0,0,0,0}; // Transparent, just a container
+        auto tab_content_scroll = side_vbox->add_child<ScrollView>();
+        tab_content_scroll->expand = true;
+        tab_content_scroll->background_color = {0,0,0,0}; // Transparent, just a container
+        tab_content_scroll->scroll_v = true;
+
+        auto tab_content = tab_content_scroll->content;
 
         VBoxContainer* page_vec = tab_content->add_child<VBoxContainer>();
         VBoxContainer* page_phy = tab_content->add_child<VBoxContainer>();
@@ -94,25 +100,30 @@ int main() {
         tabs->add_tab("Physics", page_phy);
         tabs->add_tab("World", page_env);
 
+        // Ensure pages have initial width for child layout
+        page_vec->size.x = 290;
+        page_phy->size.x = 290;
+        page_env->size.x = 290;
+
         auto add_float_row = [&](Control* page, const std::string& name, float current,
                                   std::function<void(float)> on_commit, float step = 1.0f) {
             auto row = page->add_child<HBoxContainer>();
-            row->size = {280, 32};
+            row->size = {280, 40}; // Increased height
             row->spacing = 10.0f;
-            row->padding = {0, 5, 0, 5};
+            row->padding = {5, 2, 5, 2};
 
             auto lbl = row->add_child<Label>(&text_renderer, name);
-            lbl->font_size = 15.0f;
-            lbl->size.x = 140.0f; // Fixed width for labels to align inputs
-            lbl->color = {0.8f, 0.8f, 0.8f, 1.0f};
+            lbl->font_size = 14.0f;
+            lbl->size.x = 130.0f; // Adjusted width
+            lbl->color = {0.9f, 0.9f, 0.9f, 1.0f};
 
             auto inp = row->add_child<TextInput>(&text_renderer, "", InputMode::FLOAT);
-            inp->expand = true; // Fill row
+            inp->size = {110, 32}; // Specified size
             inp->step = step;
             inp->set_float(current, 2);
-            inp->font_size = 15.0f;
-            inp->color_bg_normal  = {0.1f, 0.1f, 0.15f, 1.0f};
-            inp->color_border     = {0.3f, 0.4f, 0.6f, 0.8f};
+            inp->font_size = 14.0f;
+            inp->color_bg_normal  = {0.18f, 0.18f, 0.25f, 1.0f};
+            inp->color_border     = {0.4f, 0.5f, 0.8f, 1.0f};
             inp->on_committed = [on_commit](const std::string& s) {
                 try { on_commit(std::stof(s)); } catch (...) {}
             };
@@ -246,7 +257,15 @@ int main() {
 
             Vector2i win_size = window.get_size();
             root_hbox->size = {(f32)win_size.x, (f32)win_size.y};
-            root_hbox->layout_children(); // Re-layout for resize
+            
+            if (Input::is_key_pressed(Key::TAB)) {
+                show_ui = !show_ui;
+                root_hbox->set_visible(show_ui);
+            }
+
+            if (show_ui) {
+                root_hbox->layout_children(); // Re-layout for resize
+            }
 
             if (delta > 0.1f) delta = 0.1f;
 
@@ -397,10 +416,12 @@ int main() {
             // pp.end_scene/render removed
 
             // Render UI
-            renderer.init_camera({win_size.x / 2.0f, win_size.y / 2.0f}, 1.0f, {(f32)win_size.x, (f32)win_size.y});
-            renderer.begin();
-            root_hbox->draw_tree(renderer);
-            renderer.end();
+            if (show_ui) {
+                renderer.init_camera({win_size.x / 2.0f, win_size.y / 2.0f}, 1.0f, {(f32)win_size.x, (f32)win_size.y});
+                renderer.begin();
+                root_hbox->draw_tree(renderer);
+                renderer.end();
+            }
 
             frame_count++;
             fps_timer += delta;

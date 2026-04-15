@@ -36,6 +36,11 @@ public:
 
     Rect2f get_global_rect() const;
 
+    // Propagates width down to all non-anchored children recursively.
+    // Call before layout_children so inner containers know their width.
+    // Virtual so containers like BoxContainer can stop recursion.
+    virtual void set_width_propagate(f32 w);
+
     // Optional override for containers to position children
     virtual void layout_children();
 

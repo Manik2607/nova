@@ -17,6 +17,7 @@ public:
         : text(initial_text), text_renderer(tr) {}
 
     void draw(Renderer2D& renderer) override;
+    void layout_children() override; // calls update_size() so anchors work correctly
 
     // Optional: auto-adjust size based on text
     void update_size();
