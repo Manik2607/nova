@@ -44,10 +44,16 @@ void TextInput::apply_step(float delta) {
 void TextInput::draw(Renderer2D& renderer) {
     Transform2D global = get_global_transform();
 
+    f32 text_box_w = size.x;
+    if (is_numeric()) {
+        text_box_w -= BTN_W * 2;
+    }
+    if (text_box_w < 0.0f) text_box_w = 0.0f;
+
     // --- Background ---
     Color bg = is_focused ? color_bg_focused : color_bg_normal;
-    renderer.draw_rect(global.origin, size, bg);
-    renderer.draw_rect_outline(global.origin, size, color_border, 2.0f);
+    renderer.draw_rect(global.origin, {text_box_w, size.y}, bg);
+    renderer.draw_rect_outline(global.origin, {text_box_w, size.y}, color_border, 2.0f);
 
     // --- Text + caret ---
     if (text_renderer) {
@@ -65,7 +71,7 @@ void TextInput::draw(Renderer2D& renderer) {
         // --- Step buttons (only for numeric modes) ---
         const f32 btn_h = size.y;
         // Buttons sit to the right of the text field
-        Vector2f btn_base = global.origin + Vector2f{size.x, 0.0f};
+        Vector2f btn_base = global.origin + Vector2f{text_box_w, 0.0f};
 
         if (is_numeric()) {
             // Decrease (–) button
@@ -148,12 +154,17 @@ void TextInput::update(f32 delta) {
 bool TextInput::handle_input(Vector2f mouse_pos, bool mouse_pressed, bool mouse_released) {
     is_hovered = get_global_rect().contains(mouse_pos);
 
+    f32 text_box_w = size.x;
+    if (is_numeric()) {
+        text_box_w -= BTN_W * 2;
+    }
+    if (text_box_w < 0.0f) text_box_w = 0.0f;
+
     // --- Step button hit detection ---
     bool consumed = false;
     if (is_numeric()) {
         Transform2D global = get_global_transform();
-        Vector2f btn_base = global.origin + Vector2f{size.x, 0.0f};
-
+        Vector2f btn_base = global.origin + Vector2f{text_box_w, 0.0f};
         Rect2f dec_rect{btn_base, {BTN_W, size.y}};
         Rect2f inc_rect{btn_base + Vector2f{BTN_W, 0.0f}, {BTN_W, size.y}};
 
@@ -174,7 +185,10 @@ bool TextInput::handle_input(Vector2f mouse_pos, bool mouse_pressed, bool mouse_
 
     // --- Focus management ---
     if (mouse_pressed) {
-        if (is_hovered) {
+        Rect2f text_rect{get_global_transform().origin, {text_box_w, size.y}};
+        bool text_hovered = text_rect.contains(mouse_pos);
+
+        if (text_hovered) {
             is_focused = true;
             m_show_caret = true;
             m_blink_timer = 0.0f;

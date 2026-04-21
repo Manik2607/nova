@@ -67,7 +67,7 @@ int main() {
         
         // Sidebar Panel
         auto side_panel = root_hbox->add_child<ui::Panel>();
-        side_panel->size = {320, 0};
+        side_panel->size = {400, 0};
         side_panel->expand = false; // Stay at 320px
         side_panel->background_color = {0.05f, 0.05f, 0.07f, 0.95f};
         side_panel->padding = {15, 20, 15, 20};
@@ -117,8 +117,12 @@ int main() {
             lbl->size.x = 130.0f; // Adjusted width
             lbl->color = {0.9f, 0.9f, 0.9f, 1.0f};
 
+            auto control = row->add_child<Control>();
+            control->size.x = 130.0f; // Adjusted width
+            control->expand = true;
+
             auto inp = row->add_child<TextInput>(&text_renderer, "", InputMode::FLOAT);
-            inp->size = {110, 32}; // Specified size
+            inp->size = {150, 32}; // Specified size
             inp->step = step;
             inp->set_float(current, 2);
             inp->font_size = 14.0f;
